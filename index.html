@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#070514">
+  <title>NEON JACKPOT SCI-CALC</title>
+  <style>
+    html,body{height:100%;margin:0;background:#070514;color:#fff;font-family:system-ui,sans-serif}
+    body{display:grid;place-items:center;overflow:hidden}.boot{text-align:center;padding:28px}
+    .logo{font-size:clamp(28px,7vw,68px);font-weight:900;letter-spacing:.08em;text-shadow:0 0 12px #00eaff,0 0 30px #ff2bd6}
+    .bar{width:min(520px,80vw);height:8px;margin:24px auto;border-radius:99px;background:#21183e;overflow:hidden;box-shadow:0 0 24px #7d38ff}
+    .bar:after{content:"";display:block;width:38%;height:100%;background:linear-gradient(90deg,#00eaff,#ff2bd6,#ffd24a);animation:load 1s infinite ease-in-out}
+    .msg{opacity:.75}@keyframes load{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}
+    .err{max-width:720px;color:#ffb3c8;line-height:1.5}
+  </style>
+</head>
+<body>
+  <main class="boot"><div class="logo">🎰 NEON JACKPOT</div><div class="bar"></div><div class="msg">수학 카지노 전력 계통 기동 중…</div></main>
+  <script>
+  (async()=>{
+    const chunks=['bootstrap/payload-00.txt','bootstrap/payload-01.txt','bootstrap/payload-02.txt','bootstrap/payload-03.txt','bootstrap/payload-04.txt'];
+    const texts=await Promise.all(chunks.map(async path=>{const response=await fetch(path,{cache:'no-store'});if(!response.ok)throw new Error(`${path}: HTTP ${response.status}`);return(await response.text()).trim();}));
+    const encoded=texts.join('');
+    const binary=atob(encoded);
+    const zip=Uint8Array.from(binary,char=>char.charCodeAt(0));
+    const view=new DataView(zip.buffer,zip.byteOffset,zip.byteLength);
+    const decoder=new TextDecoder();
+    const files={};
+    let offset=0;
+    while(offset+30<=zip.length&&view.getUint32(offset,true)===0x04034b50){
+      const flags=view.getUint16(offset+6,true);
+      const method=view.getUint16(offset+8,true);
+      const compressedSize=view.getUint32(offset+18,true);
+      const nameLength=view.getUint16(offset+26,true);
+      const extraLength=view.getUint16(offset+28,true);
+      if(flags&1)throw new Error('암호화된 ZIP은 지원하지 않습니다.');
+      if(flags&8)throw new Error('데이터 디스크립터 ZIP은 지원하지 않습니다.');
+      const nameStart=offset+30;
+      const dataStart=nameStart+nameLength+extraLength;
+      const name=decoder.decode(zip.subarray(nameStart,nameStart+nameLength));
+      const compressed=zip.slice(dataStart,dataStart+compressedSize);
+      let content;
+      if(method===0){content=compressed;}
+      else if(method===8){
+        if(typeof DecompressionStream==='undefined')throw new Error('최신 브라우저가 필요합니다.');
+        const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        content=new Uint8Array(await new Response(stream).arrayBuffer());
+      }else throw new Error(`지원하지 않는 ZIP 압축 방식: ${method}`);
+      files[name]=decoder.decode(content);
+      offset=dataStart+compressedSize;
+    }
+    if(!files['index.html']||!files['styles.css']||!files['app.js'])throw new Error('배포 패키지의 필수 파일이 없습니다.');
+    const safeScript=files['app.js'].replace(/<\/script/gi,'<\\/script');
+    const page=files['index.html']
+      .replace('<link rel="stylesheet" href="styles.css" />',`<style>${files['styles.css']}</style>`)
+      .replace('<script src="app.js"></script>',`<script>${safeScript}<\/script>`);
+    document.open();document.write(page);document.close();
+  })().catch(error=>{console.error(error);document.body.innerHTML=`<main class="boot err"><div class="logo">BUST</div><h2>사이트 로딩 실패</h2><p>${String(error.message||error)}</p><p><a style="color:#63f7ff" href="https://github.com/prefix9671/neon-jackpot-calculator">GitHub 저장소 열기</a></p></main>`;});
+  </script>
+</body>
+</html>
