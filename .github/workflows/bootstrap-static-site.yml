@@ -1,0 +1,50 @@
+name: Bootstrap static site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bootstrap/**"
+      - ".github/workflows/bootstrap-static-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rebuild verified deployment archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap/payload-*.txt | base64 --decode > /tmp/neon-jackpot-static.zip
+          echo "4a5cb9cf3fc4a43bc90ca37ef1b6c49d4b6bc9720fc4642869356345ca585110  /tmp/neon-jackpot-static.zip" | sha256sum --check --strict
+          rm -rf /tmp/neon-jackpot-site
+          mkdir -p /tmp/neon-jackpot-site
+          unzip -q /tmp/neon-jackpot-static.zip -d /tmp/neon-jackpot-site
+          cp /tmp/neon-jackpot-site/index.html ./index.html
+          cp /tmp/neon-jackpot-site/styles.css ./styles.css
+          cp /tmp/neon-jackpot-site/app.js ./app.js
+          cp /tmp/neon-jackpot-site/ASSET_LICENSE.md ./ASSET_LICENSE.md
+          cp /tmp/neon-jackpot-site/README.txt ./DEPLOYMENT.txt
+          touch .nojekyll
+          rm -rf bootstrap
+
+      - name: Commit reconstructed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Deploy neon jackpot calculator static site"
+          git push
